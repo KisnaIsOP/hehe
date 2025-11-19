@@ -20,26 +20,33 @@ function sleep(ms) {
 /**
  * Call OpenRouter API with retry logic
  * 
- * @param {Array} messages - Array of message objects with role and content
+ * @param {Array} conversation - Array of message objects with role and content
+ * @param {string} userContent - The current user message content
  * @param {Object} options - Optional parameters (temperature, max_output_tokens, etc.)
  * @returns {Promise<string>} - The AI's response text
  */
-export async function callOpenRouter(messages, options = {}) {
+export async function callOpenRouter(conversation, userContent, options = {}) {
   const {
     temperature = 0.3,
     max_output_tokens = 600,
     max_retries = 3,
   } = options;
   
+  // Build messages array: conversation history + new user message
+  const messages = [
+    ...conversation.map(msg => ({
+      role: msg.role === 'user' ? 'user' : msg.role === 'system' ? 'system' : 'assistant',
+      content: msg.content
+    })),
+    { role: 'user', content: userContent }
+  ];
+  
   // Build request body following OpenRouter's format
   const requestBody = {
-    model: MODEL,
+    model: process.env.OPENROUTER_MODEL || MODEL,
     messages: messages,
-    temperature: temperature,
-    max_tokens: max_output_tokens,
-    // Optional: Add site/app info for better rate limits
-    // (uncomment and customize if needed)
-    // "route": "fallback",
+    max_output_tokens: max_output_tokens,
+    temperature: temperature
   };
   
   let lastError = null;
@@ -54,8 +61,8 @@ export async function callOpenRouter(messages, options = {}) {
         headers: {
           'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://github.com/chhotabot', // Optional: your site
-          'X-Title': 'ChhotaBot', // Optional: your app name
+          'HTTP-Referer': 'https://github.com/chhotabot',
+          'X-Title': 'ChhotaBot'
         },
         body: JSON.stringify(requestBody),
       });
@@ -73,6 +80,7 @@ export async function callOpenRouter(messages, options = {}) {
       // Handle other non-2xx responses
       if (!response.ok) {
         const errorBody = await response.text();
+        console.error('❌ Request body that caused error:', JSON.stringify(requestBody, null, 2));
         throw new Error(
           `OpenRouter API error (${response.status}): ${errorBody}`
         );
@@ -85,6 +93,8 @@ export async function callOpenRouter(messages, options = {}) {
       const content = extractContent(data);
       
       if (!content) {
+        console.error('❌ Request body:', JSON.stringify(requestBody, null, 2));
+        console.error('❌ Response data:', JSON.stringify(data, null, 2));
         throw new Error('No content returned from API');
       }
       
@@ -125,15 +135,20 @@ function extractContent(data) {
     if (data.choices && data.choices.length > 0) {
       const choice = data.choices[0];
       
-      // Check message.content
+      // Check message.content (primary format)
       if (choice.message && choice.message.content) {
         return choice.message.content.trim();
       }
       
-      // Check text field (some APIs use this)
+      // Check text field (some models use this)
       if (choice.text) {
         return choice.text.trim();
       }
+    }
+    
+    // Fallback: check output_text field
+    if (data.output_text) {
+      return data.output_text.trim();
     }
     
     // Fallback: check if response has direct content field
@@ -141,9 +156,9 @@ function extractContent(data) {
       return data.content.trim();
     }
     
-    // No content found
-    console.warn('⚠️ Unexpected API response structure:', JSON.stringify(data));
-    return null;
+    // Last resort: return stringified JSON for debugging
+    console.warn('⚠️ Unexpected API response structure:', JSON.stringify(data, null, 2));
+    return JSON.stringify(data);
     
   } catch (error) {
     console.error('❌ Error extracting content:', error);
@@ -171,9 +186,7 @@ export function formatMessages(conversationHistory) {
 export async function testConnection() {
   try {
     console.log('🧪 Testing OpenRouter connection...');
-    const response = await callOpenRouter([
-      { role: 'user', content: 'Hi! Respond with just "OK" if you can hear me.' }
-    ], { max_output_tokens: 10 });
+    const response = await callOpenRouter([], 'Hi! Respond with just "OK" if you can hear me.', { max_output_tokens: 10 });
     console.log('✅ Connection test successful. Response:', response);
     return true;
   } catch (error) {
