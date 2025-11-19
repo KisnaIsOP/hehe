@@ -182,7 +182,7 @@ async function handleAICommand(message, query) {
       max_output_tokens: 150,
     } : {};
     
-    const response = await callOpenRouter(context, options);
+    const response = await callOpenRouter(context, sanitized, options);
     
     // Add assistant response to context
     contextStore.addMessage(channelId, 'assistant', response);
