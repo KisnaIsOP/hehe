@@ -112,6 +112,88 @@ If deployment fails:
 3. Ensure Discord bot has MESSAGE CONTENT INTENT enabled
 4. Test OpenRouter API key is valid
 
+## Deploy to Zeabur
+
+Zeabur provides simple deployment with automatic scaling and free tier.
+
+### Deployment Steps
+
+1. **Connect GitHub Repository:**
+   - Go to [zeabur.com](https://zeabur.com/)
+   - Create new project and connect your GitHub repository
+
+2. **Add Environment Variables:**
+   - In Zeabur dashboard, go to your service settings
+   - Add the following environment variables:
+     ```
+     DISCORD_TOKEN=<your-discord-bot-token>
+     OPENROUTER_API_KEY=<your-openrouter-api-key>
+     OPENROUTER_MODEL=google/gemma-3-4b-it:free
+     RATE_LIMIT_PER_MINUTE=60
+     CACHE_TTL_SECONDS=120
+     ```
+
+3. **Click Deploy:**
+   - Zeabur will automatically detect Node.js
+   - Build and deployment will start automatically
+   - Monitor logs in the Zeabur dashboard
+
+### Zeabur Deploy Checklist
+
+- [ ] GitHub repository connected to Zeabur
+- [ ] All environment variables set (DISCORD_TOKEN, OPENROUTER_API_KEY, OPENROUTER_MODEL, RATE_LIMIT_PER_MINUTE, CACHE_TTL_SECONDS)
+- [ ] Discord bot has MESSAGE CONTENT INTENT enabled
+- [ ] Bot shows online in Discord after deployment
+- [ ] Check Zeabur logs for successful startup message
+
+## Deploy to Fly.io
+
+Fly.io provides fast global deployment with generous free tier.
+
+### Prerequisites
+1. [Install flyctl](https://fly.io/docs/hands-on/install-flyctl/)
+2. Create [Fly.io account](https://fly.io/app/sign-up)
+3. Discord bot token and OpenRouter API key ready
+
+### Deployment Steps
+
+1. **Login to Fly.io:**
+   ```bash
+   flyctl auth login
+   ```
+
+2. **Launch app:**
+   ```bash
+   flyctl launch
+   ```
+   - Accept defaults or customize app name/region
+   - Decline database when prompted
+
+3. **Set secrets:**
+   ```bash
+   flyctl secrets set DISCORD_TOKEN=your_discord_token_here
+   flyctl secrets set OPENROUTER_API_KEY=your_openrouter_key_here
+   ```
+
+4. **Deploy:**
+   ```bash
+   flyctl deploy
+   ```
+
+5. **Check status:**
+   ```bash
+   flyctl status
+   flyctl logs
+   ```
+
+### Fly Deploy Checklist
+
+- [ ] `flyctl` CLI installed and authenticated
+- [ ] `flyctl launch` completed successfully
+- [ ] `DISCORD_TOKEN` secret set
+- [ ] `OPENROUTER_API_KEY` secret set
+- [ ] Bot shows online in Discord after `flyctl deploy`
+
 ## Security Features
 
 - Strips Discord invite links from user input
