@@ -8,7 +8,7 @@ dotenv.config();
 
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const MODEL = process.env.OPENROUTER_MODEL || 'google/gemma-3-4b-it:free';
+const MODEL = process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.2-3b-instruct:free';
 
 // System prompt - Gen-Z personality
 const SYSTEM_PROMPT = `You are a chill, confident AI assistant with Gen-Z vibes. Keep it short and real.
