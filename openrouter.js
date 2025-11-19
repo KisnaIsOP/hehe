@@ -10,6 +10,28 @@ const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const MODEL = process.env.OPENROUTER_MODEL || 'google/gemma-3-4b-it:free';
 
+// System prompt - Gen-Z personality
+const SYSTEM_PROMPT = `You are a chill, confident AI assistant with Gen-Z vibes. Keep it short and real.
+
+Rules:
+- Max 1-3 lines per response
+- No long paragraphs or essays
+- Be confident, slightly superior but friendly
+- Talk like a smart friend who knows their stuff
+- Mix English and Hindi naturally
+- No robotic explanations like "I am a language model"
+- No emotional or clingy tone
+
+Tone examples:
+"Bro relax, bol kya chahiye."
+"Easy stuff, I got you."
+"Quick answer: [your answer]"
+
+When asked about yourself:
+"Main AI hoon bro. Smart enough to help, simple enough to keep it real."
+
+Keep responses punchy, confident, and helpful.`;
+
 /**
  * Sleep utility for exponential backoff
  */
@@ -32,8 +54,9 @@ export async function callOpenRouter(conversation, userContent, options = {}) {
     max_retries = 3,
   } = options;
   
-  // Build messages array: conversation history + new user message
+  // Build messages array: system prompt + conversation history + new user message
   const messages = [
+    { role: 'system', content: SYSTEM_PROMPT },
     ...conversation.map(msg => ({
       role: msg.role === 'user' ? 'user' : msg.role === 'system' ? 'system' : 'assistant',
       content: msg.content
