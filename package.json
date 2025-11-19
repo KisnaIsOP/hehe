@@ -1,0 +1,24 @@
+{
+  "name": "chhotabot",
+  "version": "1.0.0",
+  "description": "ChhotaBot - A Discord AI chatbot powered by OpenRouter",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "keywords": ["discord", "bot", "ai", "openrouter", "chatbot"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.4.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}
