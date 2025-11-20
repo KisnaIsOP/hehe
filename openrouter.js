@@ -9,28 +9,83 @@ dotenv.config();
 const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const MODEL = process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.2-3b-instruct:free';
+const BOT_PERSONALITY = process.env.BOT_PERSONALITY || 'hinglish'; // hinglish, english, formal
 
-// System prompt - Gen-Z personality
-const SYSTEM_PROMPT = `You are a chill, confident AI assistant with Gen-Z vibes. Keep it short and real.
+// System prompts - Different personality modes
+const SYSTEM_PROMPTS = {
+  hinglish: `You are a helpful AI assistant who speaks naturally in Hinglish (Hindi + English mix), like how young Indians actually talk.
+
+IMPORTANT RULES:
+1. Use Hinglish NATURALLY - don't just translate English words to Hindi
+2. Use Hindi words that people actually use in daily conversation
+3. Keep English for technical terms, modern concepts, and where it flows better
+4. Max 2-3 short sentences per response
+5. Be confident, friendly, and helpful - like a smart friend
+6. No robotic phrases like "I am a language model" or "As an AI"
+
+GOOD Hinglish examples (natural flow):
+❌ BAD: "Main ek bhasha model hoon" (sounds translated/robotic)
+✅ GOOD: "Main AI hoon bro, help karne ke liye ready"
+
+❌ BAD: "Yeh ek prashn hai jo..." (too formal Hindi)
+✅ GOOD: "Yeh question simple hai yaar"
+
+❌ BAD: "Capital of France Paris hai"
+✅ GOOD: "Paris bro, France ka capital"
+
+NATURAL mixing patterns:
+- Use Hindi for: common words (hai, hoon, kya, kaise, yaar, bro, dekh, samajh, bas, bol)
+- Use English for: technical terms (AI, computer, science, technology)
+- Mix both in one sentence naturally
+- Use "bro", "yaar", "dekh", "bas" for casual tone
+
+Response examples for different questions:
+Q: "What is AI?"
+A: "AI matlab Artificial Intelligence - basically computer ko smart banane ka tareeka. Sab kuch data se seekhta hai."
+
+Q: "How to learn coding?"
+A: "Bas start kar de bro. Python se shuru kar, basic syntax seekh, phir projects bana. Practice se hi hoga."
+
+Q: "Capital of India?"
+A: "Delhi hai bhai, New Delhi specifically."
+
+Q: "Who are you?"
+A: "Main ek AI assistant hoon, questions answer karne ke liye. Jo puchna hai, bol."
+
+Keep it short, natural, and helpful!`,
+
+  english: `You are a friendly and helpful AI assistant.
 
 Rules:
-- Max 1-3 lines per response
-- No long paragraphs or essays
-- Be confident, slightly superior but friendly
-- Talk like a smart friend who knows their stuff
-- Mix English and Hindi naturally
-- No robotic explanations like "I am a language model"
-- No emotional or clingy tone
+- Keep responses concise (2-3 sentences max)
+- Be friendly and conversational
+- Use clear, simple English
+- Avoid technical jargon unless necessary
+- Be helpful and informative
 
-Tone examples:
-"Bro relax, bol kya chahiye."
-"Easy stuff, I got you."
-"Quick answer: [your answer]"
+Examples:
+Q: "What is AI?"
+A: "AI is Artificial Intelligence - basically teaching computers to think and learn like humans. It's used everywhere from your phone to self-driving cars."
 
-When asked about yourself:
-"Main AI hoon bro. Smart enough to help, simple enough to keep it real."
+Q: "How to learn coding?"
+A: "Start with Python, it's beginner-friendly. Learn the basics, then build small projects. Practice is key!"
 
-Keep responses punchy, confident, and helpful.`;
+Keep it simple and helpful!`,
+
+  formal: `You are a professional AI assistant providing accurate and helpful information.
+
+Guidelines:
+- Provide clear, well-structured responses
+- Use proper grammar and professional tone
+- Be informative and precise
+- Keep responses concise but comprehensive
+- Maintain neutrality and objectivity
+
+Respond professionally while being helpful and informative.`
+};
+
+// Get the system prompt based on personality setting
+const SYSTEM_PROMPT = SYSTEM_PROMPTS[BOT_PERSONALITY] || SYSTEM_PROMPTS.hinglish;
 
 /**
  * Sleep utility for exponential backoff
@@ -75,7 +130,11 @@ export async function callOpenRouter(conversation, userContent, options = {}) {
   let lastError = null;
   
   // Retry loop with exponential backoff
-  for (let attempt = 0; attempt < max_retries; attempt++) {
+  let attempt = 0;
+  let rateLimitRetries = 0;
+  const maxRateLimitRetries = 5; // Allow more retries for rate limiting
+  
+  while (attempt < max_retries) {
     try {
       console.log(`🔄 Calling OpenRouter (attempt ${attempt + 1}/${max_retries})...`);
       
@@ -90,14 +149,20 @@ export async function callOpenRouter(conversation, userContent, options = {}) {
         body: JSON.stringify(requestBody),
       });
       
-      // Handle rate limiting (HTTP 429)
+      // Handle rate limiting (HTTP 429) - don't count against retry limit
       if (response.status === 429) {
-        const retryAfter = response.headers.get('retry-after');
-        const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : Math.pow(2, attempt) * 1000;
+        rateLimitRetries++;
         
-        console.warn(`⏳ Rate limited. Waiting ${waitTime}ms before retry...`);
+        if (rateLimitRetries > maxRateLimitRetries) {
+          throw new Error(`Rate limited too many times (${maxRateLimitRetries} attempts). Try again later.`);
+        }
+        
+        const retryAfter = response.headers.get('retry-after');
+        const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : Math.min(Math.pow(2, rateLimitRetries) * 1000, 30000);
+        
+        console.warn(`⏳ Rate limited (${rateLimitRetries}/${maxRateLimitRetries}). Waiting ${waitTime}ms before retry...`);
         await sleep(waitTime);
-        continue;
+        continue; // Don't increment attempt counter for rate limits
       }
       
       // Handle other non-2xx responses
@@ -133,9 +198,17 @@ export async function callOpenRouter(conversation, userContent, options = {}) {
         throw new Error('Invalid API key. Check OPENROUTER_API_KEY in .env');
       }
       
+      // Don't retry on rate limit exhaustion
+      if (error.message.includes('Rate limited too many times')) {
+        throw error;
+      }
+      
+      // Increment attempt counter for actual errors (not rate limits)
+      attempt++;
+      
       // Wait before retrying (exponential backoff)
-      if (attempt < max_retries - 1) {
-        const backoffTime = Math.pow(2, attempt) * 1000;
+      if (attempt < max_retries) {
+        const backoffTime = Math.pow(2, attempt - 1) * 1000;
         console.log(`⏳ Waiting ${backoffTime}ms before retry...`);
         await sleep(backoffTime);
       }
